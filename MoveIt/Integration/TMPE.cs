@@ -13,11 +13,13 @@ namespace MoveIt
         const string NAME = "TrafficManager";
         const UInt64 ID1 = 1806963141;
         const UInt64 ID2 = 1637663252;
-        internal static readonly Version MinVersion = new Version(11, 5, 1, 0);
-        
+        internal static readonly Version MinVersion = new Version(11, 5, 1); 
+        internal static readonly Version LastVersion = new Version(11, 5, 2); // only paste/import is supported in this version
+
         internal readonly bool Enabled;
 
         internal readonly Assembly Assembly;
+        internal readonly Version Version;
 
         internal readonly Type tRecordable, tNodeRecord, tSegmentRecord, tSegmentEndRecord;
         internal readonly MethodInfo mRecord, mTransfer;
@@ -40,6 +42,9 @@ namespace MoveIt
             {
                 Assembly = GetAssermly();
                 if (Assembly == null) throw new Exception("Assembly not found (Failed [TMPE-F1])");
+
+                Version version = Assembly.GetName().Version;
+                Version = new Version(version.Major, version.Minor, version.Build); // revision does not matter.
 
                 tRecordable = Assembly.GetType("TrafficManager.Util.Record.IRecordable")
                     ?? throw new Exception("Type TrafficManager.Util.Record.IRecordable not found (Failed [TMPE-F2])");
@@ -78,7 +83,7 @@ namespace MoveIt
 
         internal object CopyNode(ushort nodeId)
         {
-            if (!Enabled) return null;
+            if (!Enabled || Version == LastVersion) return null;
             var args = new object[] { nodeId };
             object record = mNewNodeRecord.Invoke(args);
             mRecord.Invoke(record, null);
@@ -87,7 +92,7 @@ namespace MoveIt
 
         internal object CopySegment(ushort segmentId)
         {
-            if (!Enabled) return null;
+            if (!Enabled || Version == LastVersion) return null;
             var args = new object[] { segmentId };
             object record = mNewSegmentRecord.Invoke(args);
             mRecord.Invoke(record, null);
@@ -96,7 +101,7 @@ namespace MoveIt
 
         internal object CopySegmentEnd(ushort segmentId, bool startNode)
         {
-            if (!Enabled) return null;
+            if (!Enabled || Version == LastVersion) return null;
             object[] args = new object[] { segmentId, startNode };
             object record = mNewSegmentEndRecord.Invoke(args);
             mRecord.Invoke(record, null);
@@ -112,7 +117,7 @@ namespace MoveIt
 
         internal string Encode64(object record)
         {
-            if (!Enabled || record == null) return null;
+            if (!Enabled || Version == LastVersion || record == null) return null;
             return EncodeUtil.Encode64(record);
         }
         internal object Decode64(string base64Data)
@@ -125,7 +130,9 @@ namespace MoveIt
         internal static bool isModInstalled()
         {
             var assembly = GetAssermly();
-            if (assembly == null || assembly.GetName().Version < MinVersion)
+            Version version = assembly.GetName().Version;
+            version = new Version(version.Major, version.Minor, version.Build); // revision does not matter.
+            if (assembly == null || version < MinVersion || version > LastVersion )
                 return false;
             return PluginManager.instance.GetPluginsInfo().Any(mod => (
                     mod.publishedFileID.AsUInt64 == ID1 ||
